@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# dbt
+target/
+dbt_packages/
+logs/
+profiles.yml
+
+# Airflow / Astro
+airflow_settings.yaml
+.astro/
+airflow.db
+airflow.cfg
+webserver_config.py
+
+# Secrets and creds
+.env
+*.json.key
+service-account*.json
+credentials/
+*.pem
+
+# Data
+*.parquet
+*.csv
+data/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
