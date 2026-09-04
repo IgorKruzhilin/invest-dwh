@@ -11,6 +11,7 @@ A rerun for the same date overwrites the file. The script never reads
 the current date, the interval always comes from arguments.
 """
 import sys
+import time
 import requests
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -20,6 +21,8 @@ market = 'shares'
 board = 'TQBR'
 bucket = 'invest-dwh-raw'
 prefix = 'moex/history'
+retries = 5
+pause = 5
 
 # column name in ISS -> type in Parquet, from history.metadata
 expected_columns = {
@@ -79,7 +82,18 @@ try:
 		limit = 100
 		cur_len = limit
 		while cur_len == limit:
-			r = requests.get('https://iss.moex.com/iss/history/engines/stock/markets/' + market + '/boards/' + board + '/securities.json?date=' + tradedate + '&limit=' + str(limit) + '&start=' + str(cur_start), timeout=60)
+			url = 'https://iss.moex.com/iss/history/engines/stock/markets/' + market + '/boards/' + board + '/securities.json?date=' + tradedate + '&limit=' + str(limit) + '&start=' + str(cur_start)
+			# ISS drops connections now and then, so retry a few times before giving up
+			for attempt in range(1, retries + 1):
+				try:
+					r = requests.get(url, timeout=60)
+					r.raise_for_status()
+					break
+				except requests.RequestException as ex:
+					log(tradedate + ' start=' + str(cur_start) + ' attempt ' + str(attempt) + ' failed: ' + str(ex))
+					if attempt == retries:
+						raise
+					time.sleep(pause * attempt)
 			data = r.json()['history']['data']
 			columns = r.json()['history']['columns']
 			cur_len = len(data)
