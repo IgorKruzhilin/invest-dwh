@@ -1,6 +1,7 @@
 -- Raw layer: external table over Parquet files in GCS.
 -- No data is copied. BigQuery reads the files at query time.
--- Partition columns market, board, tradedate come from the object path.
+-- Partition columns market, board, dt come from the object path.
+-- The key is dt, not tradedate: it must not clash with the TRADEDATE column in the files.
 -- Rerun is safe: CREATE OR REPLACE.
 
 CREATE OR REPLACE EXTERNAL TABLE `raw.moex_history`

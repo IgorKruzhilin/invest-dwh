@@ -4,8 +4,10 @@ Usage:
     python moex_history.py 2026-09-01
     python moex_history.py 2026-08-01 2026-08-31
 
-One trade date gives one file:
-    gs://invest-dwh-raw/moex/history/market=shares/board=TQBR/tradedate=2026-09-01/data.parquet
+One trade date gives one file. The partition key in the path is dt,
+not tradedate: BigQuery column names are case-insensitive, and the files
+already have a TRADEDATE column.
+    gs://invest-dwh-raw/moex/history/market=shares/board=TQBR/dt=2026-09-01/data.parquet
 
 A rerun for the same date overwrites the file. The script never reads
 the current date, the interval always comes from arguments.
@@ -117,7 +119,7 @@ try:
 			arrays.append(pa.array([extracted_at] * len(rows), type=pa.timestamp('us', tz='UTC')))
 			table = pa.Table.from_arrays(arrays, names=list(expected_columns) + ['_extracted_at'])
 
-			path = 'gs://' + bucket + '/' + prefix + '/market=' + market + '/board=' + board + '/tradedate=' + tradedate + '/data.parquet'
+			path = 'gs://' + bucket + '/' + prefix + '/market=' + market + '/board=' + board + '/dt=' + tradedate + '/data.parquet'
 			pq.write_table(table, path)
 			log(tradedate + ': ' + str(len(rows)) + ' rows -> ' + path)
 
