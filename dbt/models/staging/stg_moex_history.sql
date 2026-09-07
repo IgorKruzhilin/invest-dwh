@@ -28,4 +28,4 @@ select
 	, admittedvalue admitted_value
 	, waval wa_value
 	, _extracted_at extracted_at
-from {{ source('raw', 'moex_history') }}
+from {{ source('raw') }}
