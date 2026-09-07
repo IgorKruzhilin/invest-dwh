@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "External tables over Parquet files in GCS."
+    database: project-6feb8749-c55b-4db3-af0
+    schema: raw
+    tables:
+      - name: moex_history
+        description: "MOEX daily trade history, one row per security per trade day."

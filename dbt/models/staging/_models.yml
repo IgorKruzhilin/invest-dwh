@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: stg_moex_history
+    description: "MOEX daily trade history. One row per trade day, board and security."
+    columns:
+      - name: history_key
+        description: "Surrogate key: dt, board and sec_id."
+        data_tests:
+          - unique
+          - not_null
+      - name: sec_id
+        description: "Security ticker on the board."
+        data_tests:
+          - not_null
+      - name: dt
+        description: "Trade date, taken from the GCS path."
+        data_tests:
+          - not_null
