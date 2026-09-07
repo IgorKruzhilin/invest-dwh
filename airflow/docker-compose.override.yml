@@ -1,0 +1,10 @@
+# Astro mounts only dags, include, plugins and tests.
+# The dbt project and the extract script live one level up, so we mount them here.
+# With LocalExecutor tasks run inside the scheduler container, so it is the only
+# service that needs them.
+services:
+  scheduler:
+    volumes:
+      - ../dbt:/usr/local/airflow/dbt:ro
+      - ../extract:/usr/local/airflow/extract:ro
+      - ${HOME}/.dbt:/usr/local/airflow/.dbt:ro
