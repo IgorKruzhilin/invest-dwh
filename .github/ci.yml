@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dbt
+        run: pip install -r requirements.txt
+
+      # dbt needs a profile even to parse. It does not connect here,
+      # so the values are fake and no secret is required.
+      - name: Write a dummy profile
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml <<'EOF'
+          invest_dwh:
+            target: ci
+            outputs:
+              ci:
+                type: bigquery
+                method: oauth
+                project: dummy
+                dataset: dummy
+                location: US
+                threads: 1
+          EOF
+
+      - name: Parse the project
+        run: dbt parse --project-dir dbt
