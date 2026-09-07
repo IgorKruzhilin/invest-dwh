@@ -74,6 +74,7 @@ tilldate = datetime.strptime(sys.argv[-1], '%Y-%m-%d').date()
 log('Start moex_history ' + str(fromdate) + ' .. ' + str(tilldate))
 try:
 	extracted_at = datetime.now(timezone.utc)
+	written = 0
 
 	cur_date = fromdate
 	while cur_date <= tilldate:
@@ -122,10 +123,16 @@ try:
 			path = 'gs://' + bucket + '/' + prefix + '/market=' + market + '/board=' + board + '/dt=' + tradedate + '/data.parquet'
 			pq.write_table(table, path)
 			log(tradedate + ': ' + str(len(rows)) + ' rows -> ' + path)
+			written += 1
 
 		cur_date += timedelta(days=1)
 
 	log('Finish moex_history')
+
+	# Nothing was written for the whole interval. Exit 99 so that Airflow
+	# marks the task as skipped, not as success.
+	if written == 0:
+		sys.exit(99)
 except Exception as ex:
 	log('ERROR moex_history: ' + str(ex))
 	sys.exit(1)

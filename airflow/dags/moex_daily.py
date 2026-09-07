@@ -32,6 +32,7 @@ with DAG(
             f"python {EXTRACT} "
             "{{ data_interval_start | ds }} {{ data_interval_start | ds }}"
         ),
+        skip_on_exit_code=99,
     )
 
     dbt_build = BashOperator(
