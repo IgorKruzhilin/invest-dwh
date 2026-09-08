@@ -9,11 +9,130 @@ models:
         data_tests:
           - unique
           - not_null
-      - name: sec_id
-        description: "Security ticker on the board."
+      - name: market
+        description: "Market code taken from the GCS path, for example shares."
+      - name: board
+        description: "Board code taken from the GCS path, for example TQBR."
         data_tests:
           - not_null
       - name: dt
         description: "Trade date, taken from the GCS path."
         data_tests:
           - not_null
+      - name: sec_id
+        description: "Security ticker on the board."
+        data_tests:
+          - not_null
+      - name: board_id
+        description: >
+          Board code taken from the file. It must be equal to board, which
+          comes from the path.
+      - name: trade_date
+        description: >
+          Trade date taken from the file. It must be equal to dt, which comes
+          from the path. A singular test on this pair is planned.
+      - name: trade_session_date
+        description: "Trade day of the session, from the file."
+      - name: trading_session
+        description: "Number of the trading session."
+      - name: short_name
+        description: "Short name of the security."
+      - name: currency_id
+        description: "Currency of the trades, for example SUR."
+      - name: open_price
+        description: "Price of the pre-trade period, or price of the opening auction."
+      - name: high_price
+        description: "Highest trade price of the day."
+      - name: low_price
+        description: "Lowest trade price of the day."
+      - name: close_price
+        description: "Price of the last trade of the day."
+      - name: legal_close_price
+        description: >
+          Closing price of the day. It is not the same as close_price: that
+          one is only the last trade, this one is the price the exchange
+          publishes as the close.
+      - name: wa_price
+        description: "Weighted average price of the day."
+      - name: market_price_2
+        description: "Market price (2) in roubles, computed by the exchange."
+      - name: market_price_3
+        description: "Market price (3) in roubles, computed by the exchange."
+      - name: admitted_quote
+        description: >
+          Recognized quote. The exchange stopped to compute it on 2023-01-30,
+          so it is null in all our data, which starts in 2025.
+      - name: trend_close_price
+        description: >
+          Change of the last trade price against the last trade price of the
+          previous trade day, in percent.
+      - name: num_trades
+        description: "Number of trades in the day."
+      - name: volume
+        description: "Number of securities traded in the day."
+      - name: trade_value
+        description: "Turnover of the day in the trade currency."
+      - name: mp2_value_traded
+        description: "Turnover used to compute market price (2), in roubles."
+      - name: market_price_3_value
+        description: "Turnover used to compute market price (3), in roubles."
+      - name: admitted_value
+        description: >
+          Turnover used to compute the recognized quote. Stopped on
+          2023-01-30 as well, so it is null in all our data.
+      - name: avg_turnover_3m
+        description: >
+          Average daily turnover of trades with units over three months. The
+          name in ISS is WAVAL, but it has nothing to do with wa_price.
+      - name: extracted_at
+        description: "When the file was written by the extract script."
+  - name: stg_moex_listing
+    description: >
+      MOEX board listing. One row per board and security. The source keeps
+      the interval of board membership in listing_from_date and
+      listing_till_date, so this layer stores no history of its own.
+    columns:
+      - name: listing_key
+        description: >
+          Surrogate key: board and sec_id. The unique test on it holds our
+          assumption that one ticker has one interval on one board. A ticker
+          can be given to another issuer after a delisting; today the source
+          has no such case, and the day it appears this test goes red.
+        data_tests:
+          - unique
+          - not_null
+      - name: market
+        description: "Market code taken from the GCS path, for example shares."
+      - name: board
+        description: "Board code taken from the GCS path, for example TQBR."
+        data_tests:
+          - not_null
+      - name: sec_id
+        description: "Security ticker on the board."
+        data_tests:
+          - not_null
+      - name: board_id
+        description: >
+          Board code taken from the file. It must be equal to board. The two
+          come from different places, the path and the data, so a singular
+          test on this pair is planned.
+      - name: short_name
+        description: "Short name of the security."
+      - name: full_name
+        description: "Full name of the security, the legal name of the issue."
+      - name: price_decimals
+        description: >
+          Number of decimal places in the price on this board. This is price
+          precision, not the listing level of the exchange.
+      - name: listing_from_date
+        description: "First trade date of the security on the board."
+      - name: listing_till_date
+        description: >
+          Last trade date of the security on the board. It is never null:
+          for a security that still trades it holds the last closed trade
+          day. So "listing_till_date is null" does not mean "trades now".
+      - name: extracted_at
+        description: >
+          When the file was written by the extract script. The whole table
+          is rewritten on every load, so this is the freshness of the
+          reference data.
