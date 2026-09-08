@@ -37,7 +37,10 @@ with DAG(
 
     dbt_build = BashOperator(
         task_id="dbt_build",
-        bash_command=f"{DBT} build --project-dir {DBT_PROJECT}",
+        bash_command=(
+            f"{DBT} build --project-dir {DBT_PROJECT} "
+            "--select stg_moex_history"
+        ),
     )
 
     extract >> dbt_build

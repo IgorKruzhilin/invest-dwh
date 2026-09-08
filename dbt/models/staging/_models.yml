@@ -138,3 +138,52 @@ models:
           When the file was written by the extract script. The whole table
           is rewritten on every load, so this is the freshness of the
           reference data.
+  - name: stg_moex_splits
+    description: >
+      MOEX splits. One row per security and split date. The table is small,
+      56 rows today, and the source gives it in full on every load.
+    columns:
+      - name: split_key
+        description: >
+          Surrogate key: trade_date and sec_id. One security can have more
+          than one split, FXRU has two, so the date belongs to the key.
+        data_tests:
+          - unique
+          - not_null
+      - name: engine
+        description: >
+          Engine code taken from the GCS path, for example stock. The source
+          gives one table for the whole engine, not per market or board.
+        data_tests:
+          - not_null
+      - name: trade_date
+        description: >
+          Date of the split. It is the first trade day with the new price:
+          PLZL closed at 19011.5 before 2025-03-27 and at 1867.6 on that
+          day. So prices from this date are already on the new scale, and
+          only older prices need the correction. Trades often stop for a few
+          days before the split, and on those days close is null while
+          legal_close_price still holds the old price.
+        data_tests:
+          - not_null
+      - name: sec_id
+        description: "Security ticker."
+        data_tests:
+          - not_null
+      - name: split_before
+        description: >
+          Number of securities before the split, the denominator of the
+          correction factor.
+      - name: split_after
+        description: >
+          Number of securities after the split, the numerator of the
+          correction factor. A price older than trade_date is corrected by
+          the product of split_after / split_before over every later split.
+          Both sides are always above zero, and a singular test keeps it so:
+          a zero would either break the division or silently zero out every
+          price before the split.
+      - name: extracted_at
+        description: >
+          When the file was written by the extract script. The whole table
+          is rewritten on every load, so this is the freshness of the
+          reference data.
