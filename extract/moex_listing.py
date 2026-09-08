@@ -25,15 +25,18 @@ market = 'shares'
 board = 'TQBR'
 bucket = 'invest-dwh-raw'
 prefix = 'moex/listing'
+# name of the block in the ISS answer, it is not the name of the endpoint
+block = 'securities'
 retries = 5
 pause = 5
 
-# column name in ISS -> type in Parquet, from listing.metadata
+# column name in ISS -> type in Parquet, from securities.metadata
 expected_columns = {
 	'SECID': pa.string()
 	, 'BOARDID': pa.string()
 	, 'SHORTNAME': pa.string()
 	, 'NAME': pa.string()
+	, 'decimals': pa.int32()
 	, 'history_from': pa.date32()
 	, 'history_till': pa.date32()
 	}
@@ -70,8 +73,8 @@ try:
 				if attempt == retries:
 					raise
 				time.sleep(pause * attempt)
-		data = r.json()['listing']['data']
-		columns = r.json()['listing']['columns']
+		data = r.json()[block]['data']
+		columns = r.json()[block]['columns']
 
 		# Fail loud when ISS renames a column. Without this check the column
 		# would stay null in every row and the load would look fine.
