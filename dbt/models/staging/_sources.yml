@@ -22,3 +22,9 @@ sources:
           SCD2 and we store no snapshot. One object in GCS, rewritten in
           full on every load. See stg_moex_listing for the meaning of the
           columns.
+      - name: moex_splits
+        description: >
+          MOEX splits, one row per security and split date. One table for
+          the whole engine. The endpoint has no date interval and no paging,
+          it always answers with all rows, so the load rewrites one object
+          in full. See stg_moex_splits for the meaning of the columns.
