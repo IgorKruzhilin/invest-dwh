@@ -42,9 +42,16 @@ bq --location="$LOCATION" mk -f --dataset "$PROJECT:raw"
 bq --location="$LOCATION" mk -f --dataset "$PROJECT:stg"
 
 echo "== external tables of the raw layer"
+# BigQuery reads the schema and the partitions from the files, so a table
+# over an empty prefix cannot be created. On a new machine load the data
+# first with the extract scripts, then run this script again.
+missing_data=0
 for f in "$REPO"/bq/*.sql; do
 	echo "   $f"
-	bq query --use_legacy_sql=false < "$f"
+	if ! bq query --use_legacy_sql=false < "$f"; then
+		echo "   failed. Is there any file in GCS for this table yet?"
+		missing_data=1
+	fi
 done
 
 echo "== dbt profile, it lives outside the repo on purpose"
@@ -70,6 +77,14 @@ fi
 
 echo "== check the connection"
 "$REPO/.venv/bin/dbt" debug --project-dir "$REPO/dbt"
+
+if [ "$missing_data" = "1" ]; then
+	echo "== some external tables were not created"
+	echo "Load the data and run this script again:"
+	echo "    .venv/bin/python extract/moex_listing.py"
+	echo "    .venv/bin/python extract/moex_splits.py"
+	echo "    .venv/bin/python extract/moex_history.py 2026-09-01 2026-09-07"
+fi
 
 echo "== Airflow pool"
 # The pool lives in the Airflow database, not in this repo, so it has to be
