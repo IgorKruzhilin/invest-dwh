@@ -133,7 +133,9 @@ where
 ## Git and CI
 
 - One branch per change. Merge through a pull request. Push to `main`
-  directly only for documents.
+  directly when the change cannot change the SQL we send to BigQuery:
+  markdown files, descriptions in a yml file, comments in the code. CI runs
+  on `main` too, so a broken yml is still caught.
 - CI must be green before a merge, and the diff is read before a merge.
   A green pipeline is not a review.
 - Commit messages: imperative, first line up to 50 characters.
