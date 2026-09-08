@@ -1,12 +1,12 @@
 select
 	concat(cast(dt as string), '|', board, '|', secid) history_key
-	, market market
-	, board board
-	, dt dt
+	, market
+	, board
+	, dt
 	, secid sec_id
 	, boardid board_id
 	, tradedate trade_date
-	, trade_session_date trade_session_date
+	, trade_session_date
 	, tradingsession trading_session
 	, shortname short_name
 	, currencyid currency_id
