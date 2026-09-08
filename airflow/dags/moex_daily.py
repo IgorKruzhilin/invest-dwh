@@ -41,6 +41,14 @@ with DAG(
             f"{DBT} build --project-dir {DBT_PROJECT} "
             "--select stg_moex_history"
         ),
+        # Own folder for the dbt artifacts, and one dbt process at a time on
+        # the machine. See moex_reference for the reason.
+        env={
+            "DBT_TARGET_PATH": "/tmp/dbt_target/moex_daily",
+            "DBT_LOG_PATH": "/tmp/dbt_logs/moex_daily",
+        },
+        append_env=True,
+        pool="dbt",
     )
 
     extract >> dbt_build
