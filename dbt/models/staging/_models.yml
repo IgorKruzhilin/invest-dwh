@@ -83,7 +83,9 @@ models:
       - name: avg_turnover_3m
         description: >
           Average daily turnover of trades with units over three months. The
-          name in ISS is WAVAL, but it has nothing to do with wa_price.
+          name in ISS is WAVAL, but it has nothing to do with wa_price. For
+          an ordinary share it holds 0, not null, so count() and avg() over
+          this column mix real values of funds with zeros of shares.
       - name: extracted_at
         description: "When the file was written by the extract script."
   - name: stg_moex_listing
