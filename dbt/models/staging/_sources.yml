@@ -2,9 +2,23 @@ version: 2
 
 sources:
   - name: raw
-    description: "External tables over Parquet files in GCS."
+    description: >
+      External tables over Parquet files in GCS. Column names here are the
+      names of the MOEX ISS answer, and their meaning is described on the
+      staging model that reads the source, not twice. The official titles of
+      the ISS columns come from the columns.json endpoint of the same path.
     database: project-6feb8749-c55b-4db3-af0
     schema: raw
     tables:
       - name: moex_history
-        description: "MOEX daily trade history, one row per security per trade day."
+        description: >
+          MOEX daily trade history, one row per security per trade day. One
+          object in GCS per trade day, so a reload of one day rewrites one
+          file. See stg_moex_history for the meaning of the columns.
+      - name: moex_listing
+        description: >
+          MOEX board listing, one row per security on the board. The source
+          keeps the dates of board membership itself, so this is a ready
+          SCD2 and we store no snapshot. One object in GCS, rewritten in
+          full on every load. See stg_moex_listing for the meaning of the
+          columns.

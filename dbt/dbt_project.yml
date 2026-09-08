@@ -15,5 +15,10 @@ clean-targets: ["target", "dbt_packages"]
 
 models:
   invest_dwh:
+    # Send the descriptions from the yml files to BigQuery itself, so the
+    # console and the data catalog show them, not only dbt docs.
+    +persist_docs:
+      relation: true
+      columns: true
     staging:
       +materialized: view

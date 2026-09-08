@@ -26,6 +26,6 @@ select
 	, mp2valtrd mp2_value_traded
 	, marketprice3tradesvalue market_price_3_value
 	, admittedvalue admitted_value
-	, waval wa_value
+	, waval avg_turnover_3m
 	, _extracted_at extracted_at
 from {{ source('raw', 'moex_history') }}

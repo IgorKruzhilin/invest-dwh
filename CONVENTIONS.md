@@ -30,6 +30,10 @@ and `int_*` models, so the rule is not needed yet.
 
 The grain lives in the yml file only. Do not repeat it in a SQL comment.
 
+Column descriptions live on the model, not on the source. A source entry
+says where the data comes from, what one row is, and how the file is
+written. Two copies of the same description drift apart.
+
 ## Spec before a mart
 
 Every mart model starts from a one page spec in `specs/<name>.md`. Staging
