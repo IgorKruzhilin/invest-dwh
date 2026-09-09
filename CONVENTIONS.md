@@ -10,15 +10,27 @@ review easy. If a rule does not fit a case, change the rule here first.
 | Raw | `raw.*` | External tables over files in GCS. DDL by hand in `bq/`, dbt does not build them | external |
 | Staging | `stg_*` | One source per model, one row in equals one row out. Only names and types change | view |
 | Intermediate | `int_*` | Steps that need a name of their own | view or ephemeral |
-| Marts | not decided yet | Business layer | table or incremental |
+| Marts | `fct_*`, `dim_*` | Business layer, a star schema | table or incremental |
 
 Names are singular and follow the grain. The file name is the model name.
 
-The shape of the marts layer is an open question. A star schema with
-`dim_*` and `fct_*` and a wide denormalized table are both on the table.
-We decide it together with the grain of the portfolio mart, because the
-grain comes from the screens of the bot. Until then we only build `stg_*`
-and `int_*` models, so the rule is not needed yet.
+The marts layer is a star schema, decided 2026-09-09. The first marts are
+a periodic snapshot fact `fct_price_daily` (one row per security and
+trade day) and a dimension `dim_security` (one row per security on the
+board). A wide denormalized table was the other option. It was rejected
+because the consumer, the site, does one join on `sec_id` and there is
+nothing to denormalize. The portfolio mart is not built in BigQuery: the
+site computes portfolio value from `fct_price_daily` and its own lots,
+so the marts layer stays small. Tables exported to the site keep the
+same names there, one dictionary for both sides.
+
+Marts are source neutral. The source is a column, not a part of the
+table name: `stg_moex_history` feeds `fct_price_daily`, not
+`fct_moex_price_daily`. Keys of marts include `exchange` from day one,
+because a second exchange is planned and the same ticker on two
+exchanges is two different securities. Prices carry a `currency` column.
+Exchange specific column names stay in staging, marts use neutral names
+with the mapping written in the spec.
 
 ## Every model must have
 
