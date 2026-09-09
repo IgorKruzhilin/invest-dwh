@@ -50,6 +50,8 @@ filter it out.
 | `currency` | ISO code of the price currency. MOEX gives `SUR` for roubles, mapped to `RUB` here |
 | `close_price` | official close price as the exchange defines it. For MOEX this is `legal_close_price` in staging, not `close_price` (the last trade). Null when the exchange gave none |
 | `split_cum_factor` | product of `split_after / split_before` over all splits of the security with split date **not later than** `trade_date`. Equals 1 when there are no splits yet |
+| `extracted_at` | when the extract script wrote the source file to GCS, from staging |
+| `updated_at` | when dbt last wrote this row, `current_timestamp()` of the run. See rule 8 |
 
 ## Rules
 
@@ -100,10 +102,25 @@ filter it out.
    or the result is 9.999999 instead of 10. This lives in a macro,
    because the same factor is needed in the acceptance test.
 6. **Incremental.** Materialized as `incremental` with `merge` on
-   `price_key`. Partition by `trade_date`, cluster by `sec_id`. Each run
+   `price_key`. Partition by `trade_date`, the only partition column
+   BigQuery allows. Cluster by `exchange`, then `sec_id`: a second
+   exchange cannot be a partition, so it is the first cluster column.
+   Filters must name the exchange before the ticker, clustering prunes
+   by the prefix of the cluster list. Each run
    rebuilds a window of the last N days (default 7) to cover late files.
    The window bounds are put into the SQL as literals, not as a subquery:
-   a subquery bound does not prune partitions in BigQuery.
+   a subquery bound does not prune partitions in BigQuery. The bound
+   comes from the macro `window_start()`: the `window_start` variable
+   from Airflow when it is set, else `max(trade_date) - N days` from
+   the table itself through `run_query`.
+
+   `merge` needs the bound too. Without `incremental_predicates` the
+   merge compares new rows with the whole target table. The predicate
+   is set in `config()` from the variable directly, not from the macro:
+   `config()` is evaluated at parse time, where `run_query` cannot run.
+   So a manual run without the variable prunes the source but reads
+   the whole target. A run from Airflow always sets the variable and
+   prunes both sides.
 7. **Late split.** A split published after its date changes `K` for
    rows from the split date on. Rows before the split date do not
    change. If the split date is before the window, the rows between the
@@ -111,6 +128,12 @@ filter it out.
    sees it. The singular test in Acceptance does. The fix is not a full
    refresh: rerun the model with `window_start` set to the split date,
    the window bound as a literal pays off here a second time.
+8. **`updated_at` says when the row was touched, not when it changed.**
+   Every nightly run rewrites the whole window, so `updated_at` moves
+   on rows whose values did not change. A conditional merge that skips
+   equal rows is not in dbt-bigquery out of the box and is not worth
+   a custom merge. The site shows `max(updated_at)` as "data updated
+   at", it replaces `mv_last_price.last_update`.
 
 ## Out of scope
 
@@ -160,6 +183,7 @@ lost or added. Null prices: equal to the null count in staging,
 Parity of full and incremental: run `--full-refresh`, save `count(*)`,
 `sum(close_price)` and `sum(split_cum_factor)`. Run the model
 incrementally for the last window. The three numbers do not change.
+`updated_at` is not compared, it differs by design (rule 8).
 
 Idempotency: run the DAG for the same interval twice, `n` and `k` do not
 change.
@@ -167,8 +191,9 @@ change.
 Tests that must be green:
 
 - `unique` and `not_null` on `price_key`
-- `not_null` on `exchange`, `sec_id`, `trade_date`, `currency`. Not on
-  `close_price`, null is a valid value here
+- `not_null` on `exchange`, `sec_id`, `trade_date`, `currency`,
+  `extracted_at`, `updated_at`. Not on `close_price`, null is a valid
+  value here
 - `accepted_values` on `exchange`: `MOEX`, and on `currency`: `RUB`.
   Both lists grow with the first new source, on purpose
 - `split_cum_factor > 0`
@@ -180,7 +205,7 @@ Tests that must be green:
   data. Shape: take the securities that have a split (55), recompute `K`
   for every row of the fact of those securities from `stg_moex_splits`,
   return rows where `abs(stored - recomputed) > 1e-6`. Not `!=`, the
-  factor is a float. The cluster by `sec_id` keeps the scan to those
+  factor is a float. The cluster by `exchange, sec_id` keeps the scan to those
   securities. A red row shows `sec_id` and the first bad `trade_date`,
   that date is the late split, see rule 7. Second, cheap part: securities
   without a split must have `K = 1`, this one runs on the window
@@ -192,7 +217,7 @@ variable that bounds the model. `unique` on the window is enough:
 a date and are both inside the window. Singular tests use the same
 bound through the bounds macro. Two exceptions: the split factor test
 reads all dates for the securities that have splits (55 of them, the
-cluster by `sec_id` keeps it small), because a late split changes rows
+cluster by `exchange, sec_id` keeps it small), because a late split changes rows
 outside the window. And once a week, or on a full refresh, the tests
 run without the variable over the whole table.
 
