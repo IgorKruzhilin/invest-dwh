@@ -38,3 +38,21 @@ jobs:
 
       - name: Parse the project
         run: dbt parse --project-dir dbt
+
+  dags:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The DAGs are tested in the same image the server runs, so the
+      # Airflow version and the providers are the ones of production.
+      # The test imports every file in dags/ and fails on an import
+      # error, a cycle, a DAG without tags or with retries below two.
+      # No secrets: the test parses files, it connects to nothing.
+      - name: Test the DAGs in the Astro Runtime image
+        run: >
+          docker run --rm
+          -v "$PWD/airflow/dags:/usr/local/airflow/dags:ro"
+          -v "$PWD/airflow/tests:/usr/local/airflow/tests:ro"
+          astrocrpublic.azurecr.io/runtime:3.3-7
+          python -m pytest tests/dags -q

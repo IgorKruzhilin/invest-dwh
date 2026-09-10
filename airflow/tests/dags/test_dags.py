@@ -1,4 +1,9 @@
-"""Example DAGs test. This test ensures that all Dags have tags, retries set to two, and no import errors. This is an example pytest and may not be fit the context of your DAGs. Feel free to add and remove tests."""
+"""Integrity of the DAG files.
+
+Every file in dags/ must import without an error, every DAG must have
+tags and retries of two or more. The checks come from the Astro
+template. They run in CI in the Astro Runtime image, see ci.yml.
+"""
 
 import os
 import logging
