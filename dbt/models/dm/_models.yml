@@ -31,7 +31,8 @@ models:
           - not_null:
               config: *window
           - accepted_values:
-              values: ['MOEX']
+              arguments:
+                values: ['MOEX']
               config: *window
       - name: board
         data_type: string
@@ -61,7 +62,8 @@ models:
           - not_null:
               config: *window
           - accepted_values:
-              values: ['RUB']
+              arguments:
+                values: ['MOEX']
               config: *window
       - name: close_price
         data_type: float64
