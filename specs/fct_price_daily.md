@@ -72,8 +72,9 @@ filter it out.
    not zero and not the last known price. Both would be invented
    numbers, and zero breaks the future invariant tests on prices. What
    a missing price means for a position is a rule of the consumer, see
-   rule 3. One row in 2021 has trades but no official price. It is
-   a known single case and stays null.
+   rule 3. One row has trades but no official price: CIAN on
+   05.11.2021, its first trade day on MOEX after the IPO, 14 791 trades
+   and no official close. It is a known single case and stays null.
 2. **No adjusted price in this table.** A price series "in today's units"
    changes back in time on every new split. `split_cum_factor` for a past
    date does not change when a future split appears. So the model can be
@@ -201,7 +202,7 @@ Tests that must be green:
 - `split_cum_factor > 0`
 - singular `assert_null_price_means_no_trades`: a null price only on
   a day with `volume = 0`. Severity `warn`, because of the one known
-  row in 2021
+  row, CIAN on 05.11.2021
 - singular `assert_split_factor_matches_source`. It compares what past
   runs stored with what the splits source says today, same macro, newer
   data. Shape: take the securities that have a split (55), recompute `K`
