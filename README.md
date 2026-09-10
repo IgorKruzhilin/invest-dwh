@@ -1,14 +1,15 @@
 # invest-dwh
 
-A small data warehouse for a personal investment portfolio, built on
-GCP. The source is the MOEX ISS API, the exchange of Moscow. The old
+A data warehouse for a personal investment portfolio, built on GCP.
+The source is the ISS API of the Moscow Exchange. The old
 version of this tracker ran on Oracle with Python scripts. This project
 moves it to a cloud stack: GCS, BigQuery, dbt, Airflow, GitHub Actions.
 
-The warehouse has a real consumer: the site of the portfolio reads the
-marts. The stack is new to the author, so every decision keeps its
-reason in the repository. Every mart starts from a spec, every number
-below was measured, not estimated.
+The warehouse is built for a real consumer, the site of the portfolio.
+Today the site still reads the old base; the export of the marts to its
+database is the next step. The stack is new to the author, so every
+decision keeps its reason in the repository. Every mart starts from
+a spec, every number below was measured, not estimated.
 
 ## Architecture
 
@@ -18,7 +19,7 @@ Three layers, medallion style, all in one BigQuery project.
 |---|---|---|---|
 | Raw | `raw` | External tables over Parquet files in GCS. The history has one object per trade day, partitioned by market, board and day in the path. Each reference table is one object, rewritten in full | the extract scripts in `extract/`, run by Airflow |
 | Staging | `stg` | One view per source. Names and types only, no business logic | dbt |
-| Marts | `dm` | The star: facts and dimensions. Every model has a spec in `specs/` | dbt |
+| Marts | `dm` | The star. One fact today, its dimension is next. Every model has a spec in `specs/` | dbt |
 
 Raw data stays in GCS. BigQuery reads the Parquet files in place through
 external tables, so the storage is one copy and one bill. A query reads
@@ -52,8 +53,9 @@ the splits of the day before, every night, in silence. The reason is in
 `fct_price_daily` is a periodic snapshot fact. One row per exchange,
 security and trade day. It holds the official close price and the
 cumulative split factor, the number that turns a lot quantity from one
-date into another. `dim_security` is its dimension: one row per exchange
-and security, the names and the price precision from the board listing.
+date into another. Its dimension, `dim_security`, is the next model: the
+spec is written, one row per exchange and security, the names and the
+price precision from the board listing.
 
 The grain is proved by a query, not by a promise:
 
@@ -62,7 +64,7 @@ select count(*) as n, count(distinct price_key) as k
 from `dm.fct_price_daily`
 ```
 
-875 863 rows, 875 863 keys, equal to the row count of the staging view.
+875,863 rows, 875,863 keys, equal to the row count of the staging view.
 
 The fact is incremental: `merge` on the key, partitioned by trade day,
 clustered by exchange and security. Every night rebuilds a window of the
