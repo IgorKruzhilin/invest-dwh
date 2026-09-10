@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  - name: fct_price_daily
+    description: >
+      Daily prices of securities. One row per exchange, security and trade
+      day. Periodic snapshot fact for the site: the site takes the price and
+      the split factor from here and computes the value of a portfolio from
+      its own lots. The official close price is stored as the exchange gave
+      it, null when there was none. The spec is in specs/fct_price_daily.md.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: price_key
+        data_type: string
+        description: "Surrogate key: exchange, sec_id and trade_date, joined with a pipe."
+        data_tests:
+          - unique:
+              config: &window
+                where: "trade_date >= date '{{ var('window_start', '1900-01-01') }}'"
+          - not_null:
+              config: *window
+      - name: exchange
+        data_type: string
+        description: >
+          Exchange code, part of the key. Only MOEX today. The same ticker on
+          two exchanges is two different securities, so the exchange is in the
+          key from day one.
+        data_tests:
+          - not_null:
+              config: *window
+          - accepted_values:
+              arguments:
+                values: ['MOEX']
+              config: *window
+      - name: board
+        data_type: string
+        description: >
+          Board on the exchange, TQBR today. An attribute, not part of the
+          key: a security is loaded from one main board only.
+      - name: sec_id
+        data_type: string
+        description: "Security ticker, local to its exchange."
+        data_tests:
+          - not_null:
+              config: *window
+      - name: trade_date
+        data_type: date
+        description: >
+          Trade day. Taken from dt in staging, that is from the GCS path, not
+          from the file. Partition column.
+        data_tests:
+          - not_null:
+              config: *window
+      - name: currency
+        data_type: string
+        description: >
+          ISO code of the price currency. MOEX gives SUR for roubles, it is
+          mapped to RUB here. Only RUB today.
+        data_tests:
+          - not_null:
+              config: *window
+          - accepted_values:
+              arguments:
+                values: ['RUB']
+              config: *window
+      - name: close_price
+        data_type: float64
+        description: >
+          Official close price as the exchange defines it. For MOEX this is
+          legal_close_price in staging, not close_price, which is only the
+          last trade: before a split trading stops for a few days and only
+          the official close keeps a value. Null when the exchange gave no
+          price, about 2 percent of rows, illiquid securities on days without
+          trades. The fact keeps null on purpose. What a missing price means
+          for a position is a rule of the site, not of the warehouse.
+      - name: split_cum_factor
+        data_type: float64
+        description: >
+          Product of split_after / split_before over all splits of the
+          security with a split date not later than trade_date. Equals 1
+          before the first split. For a lot opened on d0, the quantity on
+          date d is qty0 * K(d) / K(d0), where K is this column. Splits
+          before d0 are in both numbers and cancel out. A value for a past
+          date does not change when a new split appears, so the model can be
+          incremental by date.
+      - name: extracted_at
+        data_type: timestamp
+        description: "When the extract script wrote the source file to GCS. From staging."
+        data_tests:
+          - not_null:
+              config: *window
+      - name: updated_at
+        data_type: timestamp
+        description: >
+          When dbt last wrote this row. Says when the row was touched, not
+          when it changed: every nightly run rewrites the whole window. The
+          site shows max(updated_at) as the time of the last update.
+        data_tests:
+          - not_null:
+              config: *window

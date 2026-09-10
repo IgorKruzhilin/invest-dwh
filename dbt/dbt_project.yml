@@ -22,3 +22,6 @@ models:
       columns: true
     staging:
       +materialized: view
+    dm:
+      +materialized: table
+      +schema: dm
