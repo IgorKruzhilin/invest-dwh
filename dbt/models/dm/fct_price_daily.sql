@@ -2,6 +2,7 @@
     materialized='incremental'
     , incremental_strategy='merge'
     , unique_key='price_key'
+	, on_schema_change='fail'
     , partition_by={'field': 'trade_date', 'data_type': 'date'}
     , cluster_by=['exchange', 'sec_id']
     , incremental_predicates=[
