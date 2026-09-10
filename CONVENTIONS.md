@@ -130,7 +130,8 @@ where
 - No business logic in a DAG. It only orders the work.
 - The date comes from `data_interval_start`.
 - Paths inside the container are constants at the top of the file.
-- Set `retries` and `max_active_runs` in the DAG.
+- Set `retries`, `max_active_runs` and `tags` in the DAG. CI checks the
+  tags and `retries >= 2` on every DAG file.
 - Do not create Connections or Variables while the machine service account
   and plain constants are enough.
 - No network or database calls at the top level of a DAG file. The file is
