@@ -23,6 +23,7 @@ A failed loader fails the sensor at once, and the mart is red, not stale.
 from datetime import timedelta
 
 import pendulum
+import nothing_here
 from airflow.sdk import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
