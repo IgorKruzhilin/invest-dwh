@@ -1,3 +1,5 @@
 requests>=2.32
 pyarrow>=22
-dbt-bigquery>=1.9
+# Pinned to the versions on the server, so CI and the DAGs run the same dbt.
+dbt-core==1.12.3
+dbt-bigquery==1.12.0

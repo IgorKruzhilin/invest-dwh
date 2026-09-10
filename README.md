@@ -30,6 +30,13 @@ the dbt profile in `~/.dbt`, and the Airflow pool `dbt`. It loads no data.
 State that is not in this repo: the dbt profile and the Airflow pool. Both are
 made again by `bootstrap.sh`.
 
+CI builds every model on a pull request into the dataset `ci`. It enters GCP
+through Workload Identity Federation as the service account `ci-dbt`, so no
+key is stored on GitHub. The pool, the provider, the account, its roles and
+the dataset are made by hand with `gcloud` and `bq`, the commands are in
+`.github/README.md`. The repository variables `GCP_PROJECT`,
+`GCP_WIF_PROVIDER` and `GCP_CI_SERVICE_ACCOUNT` point the workflow at them.
+
 ## Rules of the code
 
 See `CONVENTIONS.md`.
