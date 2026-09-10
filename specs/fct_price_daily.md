@@ -172,7 +172,7 @@ Grain, run in BigQuery after `dbt build`:
 
 ```sql
 select count(*) as n, count(distinct price_key) as k
-from `stg.fct_price_daily`
+from `dm.fct_price_daily`
 ```
 
 `n` must equal `k`. Then the same on one day and one security with
