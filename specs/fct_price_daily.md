@@ -217,11 +217,15 @@ Tests that must be green:
 variable that bounds the model. `unique` on the window is enough:
 `price_key` contains `trade_date`, so two rows with one key share
 a date and are both inside the window. Singular tests use the same
-bound through the bounds macro. Two exceptions: the split factor test
+variable as a literal, not the macro: inside a test `this` is the test
+itself, not the fact. Two exceptions: the split factor test
 reads all dates for the securities that have splits (55 of them, the
 cluster by `exchange, sec_id` keeps it small), because a late split changes rows
-outside the window. And once a week, or on a full refresh, the tests
-run without the variable over the whole table.
+outside the window. And after a full refresh, or after a rerun with an
+old `window_start`, the tests run once without the variable over the
+whole table, by hand. There is no weekly full run: the rows outside the
+window are not touched by the nightly merge, so the window tests would
+find nothing new there.
 
 Numbers to write in the pull request: rows, bytes scanned by a full
 build, bytes scanned by an incremental run, run time of both.
