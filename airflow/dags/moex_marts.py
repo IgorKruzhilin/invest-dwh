@@ -40,7 +40,10 @@ def reference_run(dt):
 with DAG(
     dag_id="moex_marts",
     description="MOEX marts: wait for the history and the reference of the day, then dbt",
-    start_date=pendulum.datetime(2026, 9, 10, tz="UTC"),
+    # Same start as moex_daily. Airflow creates no task for a run whose
+    # interval ends before start_date, so a later date would block a rerun
+    # for a past day. catchup=False keeps old days from running by itself.
+    start_date=pendulum.datetime(2026, 9, 1, tz="UTC"),
     schedule=CronDataIntervalTimetable("30 0 * * *", timezone="UTC"),
     catchup=False,
     max_active_runs=1,
