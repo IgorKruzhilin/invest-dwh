@@ -1,9 +1,9 @@
 name: CI
 
+# Only on a pull request. A merge commit is the head of the PR that
+# was already checked, and direct pushes to main are text only.
 on:
   pull_request:
-  push:
-    branches: [main]
 
 jobs:
   parse:
@@ -38,6 +38,56 @@ jobs:
 
       - name: Parse the project
         run: dbt parse --project-dir dbt
+
+  build:
+    runs-on: ubuntu-latest
+    # The job needs an OIDC token from GitHub to get into GCP without
+    # a key. contents: read is the default that permissions: would drop.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dbt
+        run: pip install -r requirements.txt
+
+      # Workload Identity Federation. GitHub signs a token for this run,
+      # GCP swaps it for a short lived access as the CI service account.
+      # No key is stored anywhere. The provider and the account are
+      # repository variables, not secrets: they are names, not credentials.
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_CI_SERVICE_ACCOUNT }}
+
+      # The target is named ci on purpose: generate_schema_name sends
+      # every model to this one dataset for that target.
+      - name: Write the CI profile
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml <<'EOF'
+          invest_dwh:
+            target: ci
+            outputs:
+              ci:
+                type: bigquery
+                method: oauth
+                project: ${{ vars.GCP_PROJECT }}
+                dataset: ci
+                location: US
+                threads: 4
+                maximum_bytes_billed: 1000000000
+          EOF
+
+      # Full refresh: the fact is built from scratch on every pull
+      # request, so the run does not depend on what the last one left.
+      - name: Build and test everything in the ci dataset
+        run: dbt build --project-dir dbt --full-refresh
 
   dags:
     runs-on: ubuntu-latest
