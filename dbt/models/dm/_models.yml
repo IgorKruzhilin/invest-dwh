@@ -63,7 +63,7 @@ models:
               config: *window
           - accepted_values:
               arguments:
-                values: ['MOEX']
+                values: ['RUB']
               config: *window
       - name: close_price
         data_type: float64

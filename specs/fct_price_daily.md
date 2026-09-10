@@ -120,7 +120,9 @@ filter it out.
    `config()` is evaluated at parse time, where `run_query` cannot run.
    So a manual run without the variable prunes the source but reads
    the whole target. A run from Airflow always sets the variable and
-   prunes both sides.
+   prunes both sides. Measured on 10.09.2026 with 875 863 rows in the
+   target: the merge without the variable scanned 25.8 MiB, with the
+   variable 0.5 MiB. So a run by hand also sets the variable, always.
 7. **Late split.** A split published after its date changes `K` for
    rows from the split date on. Rows before the split date do not
    change. If the split date is before the window, the rows between the
