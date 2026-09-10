@@ -137,6 +137,11 @@ where
   parsed every few seconds.
 - Always pass `--max-active-runs 1` to a backfill. Two runs at the same time
   write the same objects.
+- A DAG with more than one upstream DAG waits for them with
+  `ExternalTaskSensor` on the same logical date. The loaders stay
+  independent and know nothing about the consumer. Do not schedule the
+  consumer on an AND of assets: it fires on the first pair of events, and
+  after one failed night the pairs shift by a day for good.
 - Do not change the timetable of a live DAG. The timetable defines what
   `logical_date` means, so old runs sit on the dates the new schedule needs.
   The next run is then skipped without any error in the log. Use a new
