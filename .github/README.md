@@ -22,6 +22,12 @@ PROJECT=project-6feb8749-c55b-4db3-af0
 REPO=IgorKruzhilin/invest-dwh
 SA=ci-dbt@$PROJECT.iam.gserviceaccount.com
 
+# 0. The API that turns a federated token into an access token of
+#    a service account. It is off in a new project, and without it the
+#    workflow fails with "IAM Service Account Credentials API has not
+#    been used in project".
+gcloud services enable iamcredentials.googleapis.com --project $PROJECT
+
 # 1. The service account for CI. Not the one of the server.
 gcloud iam service-accounts create ci-dbt \
   --project $PROJECT \
