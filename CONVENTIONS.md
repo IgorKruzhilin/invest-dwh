@@ -10,14 +10,15 @@ review easy. If a rule does not fit a case, change the rule here first.
 | Raw | `raw.*` | External tables over files in GCS. DDL by hand in `bq/`, dbt does not build them | external |
 | Staging | `stg_*` | One source per model, one row in equals one row out. Only names and types change | view |
 | Intermediate | `int_*` | Steps that need a name of their own | view or ephemeral |
+| Snapshot | `snap_*` | History of a source as type 2 versions, built by `dbt snapshot`. Dataset `snap`, the only state that cannot be rebuilt from GCS | snapshot |
 | Marts | `fct_*`, `dim_*` | Business layer, a star schema | table or incremental |
 
 Names are singular and follow the grain. The file name is the model name.
 
 The marts layer is a star schema, decided 2026-09-09. The first marts are
 a periodic snapshot fact `fct_price_daily` (one row per security and
-trade day) and a dimension `dim_security` (one row per security on the
-board). A wide denormalized table was the other option. It was rejected
+trade day) and a dimension `dim_security` (one row per security and
+version, type 2). A wide denormalized table was the other option. It was rejected
 because the consumer, the site, does one join on `sec_id` and there is
 nothing to denormalize. The portfolio mart is not built in BigQuery: the
 site computes portfolio value from `fct_price_daily` and its own lots,
@@ -108,6 +109,38 @@ where
   `assert_dt_matches_trade_date.sql`.
 - Every data bug we find gets a test, not only a fix.
 
+## Open intervals
+
+An open interval ends with the sentinel `9999-12-31`, never with `null`:
+`valid_to` of the current version, `listing_till_date` of a listed
+security. A range filter is then `valid_from <= t and t < valid_to` with
+no `coalesce`, and "current" is one comparison, so there is no
+`is_current` flag next to the date it would repeat.
+
+## Snapshots
+
+- A snapshot is defined in a yml file in `dbt/snapshots/` over a `ref`,
+  never with SQL of its own. The mapping of columns lives in an `int_*`
+  model above it.
+- Strategy `check` with an explicit list of `check_cols`. Never `all`:
+  a new column would then open a version for every row.
+- `hard_deletes: invalidate`. A row that disappears from the source
+  closes its version. By default dbt leaves it open forever.
+- `dbt_valid_to_current` is the sentinel above, and the meta columns are
+  renamed with `snapshot_meta_column_names` to `valid_from`,
+  `valid_to`, `version_id`, `snapshot_updated_at`.
+- A snapshot table is never dropped and never rebuilt. `--full-refresh`
+  does not touch it, dbt ignores the flag for snapshots. Before any
+  change of the snapshot yml, take a BigQuery table snapshot:
+  `bq cp --snapshot snap.<name> snap.<name>_bak_YYYYMMDD`. Delete the
+  backup after the change is proved.
+- A new tracked column is a migration in four steps: backup, add the
+  column to the query only, `update` the open versions from the source,
+  then add it to `check_cols` and prove that the count of versions did
+  not change. The order is written in `specs/dim_security.md`.
+- A column removed from the query stays in the table. dbt never drops
+  a snapshot column. Write why in the yml.
+
 ## Incremental models
 
 - Use `incremental` only with a `unique_key` and the `merge` strategy.
@@ -138,11 +171,18 @@ where
   parsed every few seconds.
 - Always pass `--max-active-runs 1` to a backfill. Two runs at the same time
   write the same objects.
+- A DAG with one upstream DAG is scheduled on the Asset that the
+  upstream task emits with `outlets`. No sensor, no cron offset, and a
+  rerun of the upstream by hand refreshes the consumer too. An Asset run
+  has no data interval, so this fits only a consumer that needs no date.
 - A DAG with more than one upstream DAG waits for them with
   `ExternalTaskSensor` on the same logical date. The loaders stay
   independent and know nothing about the consumer. Do not schedule the
   consumer on an AND of assets: it fires on the first pair of events, and
   after one failed night the pairs shift by a day for good.
+- The export to the site is a task in the DAG that builds the object,
+  right after its `dbt_build`. It runs only when the build is green and
+  is skipped with it. One DAG per object means one export per DAG.
 - Do not change the timetable of a live DAG. The timetable defines what
   `logical_date` means, so old runs sit on the dates the new schedule needs.
   The next run is then skipped without any error in the log. Use a new
