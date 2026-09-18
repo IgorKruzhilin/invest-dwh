@@ -245,7 +245,7 @@ The two numbers must be equal, 506 on 10.09.2026. A gap means a security
 on the board without a row in the history that day, or the reverse, and
 rule 2 must be revisited with the rows that differ.
 
-Idempotency: run `dbt build --select +dim_security` twice in a row.
+Idempotency: run `dbt build --select int_moex_listing+` twice in a row.
 The count of versions and `sum(price_decimals)` do not change. The
 second run of the snapshot must report zero new rows.
 
@@ -282,8 +282,10 @@ The fact has two inputs and needs the day lock of two sensors. The
 dimension has one input, so it needs no lock at all: `moex_dim` is
 scheduled on the Asset that `dbt_build` of `moex_reference` emits, with
 no sensor and no cron offset. One task, `dbt_build` with
-`--select +dim_security`; `dbt build` runs the snapshot before the
-model by itself. The export to the site comes as the next task in the
+`--select int_moex_listing+`: the intermediate model, the snapshot, the
+dimension and their tests. The selector does not start at the staging
+view, that layer belongs to `moex_reference`. `dbt build` runs the
+snapshot before the model by itself. The export to the site comes as the next task in the
 same DAG. A red fact does not stop the names on the site, and a red
 dimension does not stop the prices; the status of a `moex_dim` run is
 the status of the dimension and nothing else. A rerun of

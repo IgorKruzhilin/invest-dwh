@@ -40,6 +40,10 @@ echo "== BigQuery datasets"
 # -f exits with 0 when the dataset is already there
 bq --location="$LOCATION" mk -f --dataset "$PROJECT:raw"
 bq --location="$LOCATION" mk -f --dataset "$PROJECT:stg"
+# snap holds the dbt snapshots, the only state that cannot be rebuilt from
+# GCS. dbt would create it by itself; it is here so that the list of
+# datasets that must survive a new machine is in one place.
+bq --location="$LOCATION" mk -f --dataset "$PROJECT:snap"
 
 echo "== external tables of the raw layer"
 # BigQuery reads the schema and the partitions from the files, so a table

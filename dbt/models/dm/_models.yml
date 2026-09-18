@@ -45,6 +45,13 @@ models:
         data_tests:
           - not_null:
               config: *window
+          # On the whole fact, not on the window: a security that traded
+          # years ago and left the listing today must be seen. The test
+          # reads two clustered columns, a few megabytes.
+          - relationships:
+              arguments:
+                to: ref('dim_security')
+                field: sec_id
       - name: trade_date
         data_type: date
         description: >
@@ -100,3 +107,95 @@ models:
         data_tests:
           - not_null:
               config: *window
+  - name: dim_security
+    description: >
+      Securities with their names and price precision, as type 2 versions.
+      One row per exchange, security and version. Every security has
+      exactly one open version, valid_to = 9999-12-31, and the site reads
+      only open versions of listed securities. The history of versions
+      lives in the snapshot snap_moex_listing; this model is rebuilt from
+      it on every run. The spec is in specs/dim_security.md.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: security_key
+        data_type: string
+        description: "Surrogate key of the version: exchange, sec_id and valid_from, joined with a pipe."
+        data_tests:
+          - unique
+          - not_null
+      - name: exchange
+        data_type: string
+        description: "Exchange code, part of the key. Only MOEX today."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['MOEX']
+      - name: sec_id
+        data_type: string
+        description: "Security ticker, local to its exchange. fct_price_daily joins on it."
+        data_tests:
+          - not_null
+      - name: board
+        data_type: string
+        description: >
+          Main board of the security, TQBR today. An attribute, not part
+          of the key.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['TQBR']
+      - name: short_name
+        data_type: string
+        description: "Short name of the security. The site shows it next to a position."
+        data_tests:
+          - not_null
+      - name: full_name
+        data_type: string
+        description: "Full legal name of the issue. May be null, the source does not promise it."
+      - name: price_decimals
+        data_type: int64
+        description: "Number of decimal places in the price on the board. The site rounds with it."
+        data_tests:
+          - not_null
+      - name: listing_from_date
+        data_type: date
+        description: "First trade date on the board, from the source."
+        data_tests:
+          - not_null
+      - name: listing_till_date
+        data_type: date
+        description: >
+          9999-12-31 while the security is on the board, else the last
+          trade date on the board from the source. A delisting closes the
+          version with the sentinel and opens one with the real date.
+        data_tests:
+          - not_null
+      - name: valid_from
+        data_type: timestamp
+        description: >
+          When this version was first seen by the snapshot. For the first
+          version of a security this is the time of the first snapshot
+          run, not listing_from_date.
+        data_tests:
+          - not_null
+      - name: valid_to
+        data_type: timestamp
+        description: >
+          When the next version was seen, or 9999-12-31 for the open
+          version. Never null, so a range filter needs no coalesce.
+        data_tests:
+          - not_null
+      - name: extracted_at
+        data_type: timestamp
+        description: "When the extract script wrote the listing file that produced this version."
+        data_tests:
+          - not_null
+      - name: updated_at
+        data_type: timestamp
+        description: "When dbt last wrote this row. The whole table is rebuilt on every run."
+        data_tests:
+          - not_null

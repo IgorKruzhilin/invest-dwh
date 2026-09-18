@@ -1,11 +1,15 @@
-"""MOEX marts: fct_price_daily today, dim_security later.
+"""MOEX marts with more than one input: fct_price_daily.
 
-A mart has more than one input, so it is built here, below both loaders,
-not inside one of them. The loaders keep their own schedules and know
-nothing about this DAG. This DAG runs by cron after them and waits for
-both with ExternalTaskSensor on the same logical date. This is the day
-lock: the mart for day D needs the history of day D and the reference
-of the same night, not any two runs that happen to be there.
+A mart with two inputs is built here, below both loaders, not inside one
+of them. The loaders keep their own schedules and know nothing about
+this DAG. This DAG runs by cron after them and waits for both with
+ExternalTaskSensor on the same logical date. This is the day lock: the
+mart for day D needs the history of day D and the reference of the same
+night, not any two runs that happen to be there.
+
+dim_security has one input, the listing, so it is not here: its DAG
+moex_dim runs on the Asset of moex_reference and needs no lock. A red
+fact does not stop the names on the site, and the reverse.
 
 An AND of assets was rejected. It fires on the first pair of events, and
 after one failed night the pairs shift by a day and stay shifted: the
@@ -39,7 +43,7 @@ def reference_run(dt):
 
 with DAG(
     dag_id="moex_marts",
-    description="MOEX marts: wait for the history and the reference of the day, then dbt",
+    description="MOEX fact: wait for the history and the reference of the day, then dbt",
     # Same start as moex_daily. Airflow creates no task for a run whose
     # interval ends before start_date, so a later date would block a rerun
     # for a past day. catchup=False keeps old days from running by itself.

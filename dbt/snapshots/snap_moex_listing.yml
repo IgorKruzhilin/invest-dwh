@@ -1,0 +1,56 @@
+version: 2
+
+snapshots:
+  - name: snap_moex_listing
+    relation: ref('int_moex_listing')
+    description: >
+      History of the board listing as type 2 versions. One row per
+      security and version. A version is the state of the tracked columns
+      between two changes in the source. This table is the only state of
+      the project that cannot be rebuilt from GCS: it is never dropped,
+      and every change of this file follows CONVENTIONS.md, section
+      Snapshots.
+    config:
+      unique_key: security_id
+      # The source has no change timestamp: extracted_at is the time of
+      # the load and moves every night. So dbt compares the tracked
+      # columns instead. The list is explicit on purpose: "all" would open
+      # a version for every row on the first new column.
+      strategy: check
+      check_cols:
+        - board
+        - short_name
+        - full_name
+        - price_decimals
+        - listing_from_date
+        - listing_till_date
+      # A row that disappears from the listing closes its version. The
+      # default, ignore, would keep it open forever. The dimension test on
+      # one open version per security then goes red and the run stops.
+      hard_deletes: invalidate
+      # Open versions end with the sentinel, not with null, see
+      # CONVENTIONS.md, section Open intervals.
+      dbt_valid_to_current: "timestamp('9999-12-31')"
+      snapshot_meta_column_names:
+        dbt_valid_from: valid_from
+        dbt_valid_to: valid_to
+        dbt_scd_id: version_id
+        dbt_updated_at: snapshot_updated_at
+    columns:
+      - name: version_id
+        description: "Surrogate key of the version, a hash of security_id and valid_from."
+        data_tests:
+          - unique
+          - not_null
+      - name: security_id
+        description: "Natural key of the security, exchange and sec_id."
+        data_tests:
+          - not_null
+      - name: valid_from
+        description: "When this version was first seen by the snapshot."
+      - name: valid_to
+        description: "When the next version was seen, or 9999-12-31 for the open version."
+      - name: extracted_at
+        description: >
+          Not a tracked column. It stays as it was when the version was
+          opened, so it says which load produced the version.

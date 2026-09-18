@@ -15,6 +15,11 @@ The selector has no + on purpose. A mart has more than one source, so it
 must be built in one place that sits below all of its inputs, not by every
 loader that touches one of them.
 
+dbt_build emits one Asset per staging table when it is green. This DAG
+still knows nothing about its consumers: an Asset is a fact about the
+data, not a call to a DAG. A consumer with this one input, moex_dim, is
+scheduled on the Asset and needs no sensor.
+
 The pool dbt keeps one dbt process at a time on this small machine. It
 lives in the Airflow database, not in this repo, so bootstrap.sh creates it
 again on a new machine.
@@ -22,7 +27,7 @@ again on a new machine.
 from datetime import timedelta
 
 import pendulum
-from airflow.sdk import DAG
+from airflow.sdk import DAG, Asset
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.timetables.trigger import CronTriggerTimetable
 
@@ -67,6 +72,7 @@ with DAG(
         },
         append_env=True,
         pool="dbt",
+        outlets=[Asset(name="stg_moex_listing"), Asset(name="stg_moex_splits")],
     )
 
     [extract_listing, extract_splits] >> dbt_build
