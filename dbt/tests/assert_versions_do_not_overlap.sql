@@ -1,6 +1,11 @@
--- The versions of a security form a chain: valid_to of one version is
--- valid_from of the next. A gap or an overlap breaks the range join
--- valid_from <= t and t < valid_to.
+-- The versions of a security must not overlap: the range filter
+-- valid_from <= t and t < valid_to must match one row at most.
+--
+-- A gap between two versions is not an error. It is the interval when the
+-- security was not in the listing at all: the snapshot closed its version
+-- on the run that did not see it and opened a new one when it came back.
+-- Inside the gap the honest answer is that the security was not listed,
+-- and no row matches. Proved by hand on 2026-09-24 with SBER.
 with versions as (
 	select
 		security_key
@@ -13,6 +18,4 @@ select
 	, valid_to
 	, next_valid_from
 from versions
-where
-	next_valid_from is not null
-	and valid_to != next_valid_from
+where next_valid_from < valid_to

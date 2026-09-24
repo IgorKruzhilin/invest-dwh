@@ -101,6 +101,9 @@ A sentinel date instead of `null` keeps range joins and filters plain,
    the export. That is on purpose: the listing covers the whole history
    of the board, so a vanished row is a change in the source that a
    human must look at, not a case to hide with a `left join` in the fact.
+   If the row comes back later, the snapshot opens a new version and the
+   history keeps the gap between the two. The gap is the record of the
+   days when the security was not in the listing.
 4. **Every security of the fact is here.** A `relationships` test from
    `fct_price_daily.sec_id` to `dim_security.sec_id` runs on the whole
    fact, not on the reload window: the two columns are clustered and the
@@ -131,8 +134,12 @@ project that is not in git and not in GCS. Three layers of protection:
    BigQuery keeps seven days of time travel on the table as the last
    safety net.
 2. **Before any change of the snapshot yml, a BigQuery table snapshot.**
-   `bq cp --snapshot snap.snap_moex_listing snap.snap_moex_listing_bak_YYYYMMDD`
-   is zero copy and costs nothing until the tables diverge. Do it before
+   `bq cp --snapshot -n snap.snap_moex_listing snap.snap_moex_listing_bak_YYYYMMDD`
+   is zero copy and costs nothing until the tables diverge. The `-n` is
+   not optional: `bq cp` sends `WRITE_TRUNCATE` by default and a
+   snapshot cannot be overwritten, only created. It also means the
+   command fails instead of replacing a backup of the same name.
+   Restore with `bq cp --restore --force <backup> <table>`. Do it before
    a change of `check_cols`, `unique_key`, `strategy` or the meta column
    names. Delete the backup after the change is proved.
 3. **Adding a tracked column is a migration, not an edit.** dbt adds a
@@ -200,7 +207,8 @@ from `dm.dim_security`
 ```
 
 `n` must equal `k`. On the first run both equal `count(*)` of
-`stg_moex_listing`, 713 on 10.09.2026: one version per security.
+`stg_moex_listing`: one version per security. Proved on 24.09.2026,
+the first build: 714 = 714 = 714.
 
 One open version per security:
 
@@ -211,7 +219,8 @@ select
 from `dm.dim_security`
 ```
 
-The two numbers must be equal.
+The two numbers must be equal. Proved on 24.09.2026: 714 securities,
+714 open versions.
 
 Fact coverage, the star holds. Run once at acceptance; every night the
 same check is the `relationships` test below:
@@ -228,7 +237,7 @@ where
 	d.sec_id is null
 ```
 
-`missing` must be 0.
+`missing` must be 0. Proved on 24.09.2026.
 
 Rule 2, the sentinel against the history:
 
@@ -241,7 +250,8 @@ select
 	   where dt = (select max(dt) from `stg.stg_moex_history`)) traded
 ```
 
-The two numbers must be equal, 506 on 10.09.2026. A gap means a security
+The two numbers must be equal. Proved on 24.09.2026: 506 and 506.
+A gap means a security
 on the board without a row in the history that day, or the reverse, and
 rule 2 must be revisited with the rows that differ.
 
@@ -249,11 +259,15 @@ Idempotency: run `dbt build --select int_moex_listing+` twice in a row.
 The count of versions and `sum(price_decimals)` do not change. The
 second run of the snapshot must report zero new rows.
 
-Rule 3, proved by hand once: delete one row from the listing file in
-GCS, run the snapshot, see the version closed and the test red, put the
-file back, run again, see a new open version for that security and the
-test green. This is the only way to test the setting without waiting for
-the source to change.
+Rule 3, proved by hand on 24.09.2026 with `SBER`: the row was deleted
+from the listing file in GCS, the snapshot closed the version at
+10:54:52 and `assert_security_has_one_open_version` went red; the file
+was restored and the next run opened a new version at 10:56:15. The two
+minutes between them stay in the history as the interval when the
+security was not listed. The false versions were then removed by
+restoring the snapshot table from the backup of step 2 above, which is
+also the first real run of that procedure. This is the only way to test
+the setting without waiting for the source to change.
 
 Tests that must be green:
 
@@ -270,8 +284,12 @@ Tests that must be green:
   `exchange, sec_id` the count of rows with `valid_to = '9999-12-31'`
   is exactly one. Zero is a vanished row, rule 3. Two is a second board
   or a broken key. Severity `error`: the run stops
-- singular `assert_versions_do_not_overlap`: for every security,
-  `valid_to` of a version equals `valid_from` of the next one
+- singular `assert_versions_do_not_overlap`: for every security, no
+  version starts before the previous one ends. A gap between two
+  versions is allowed: it is the interval when the security was not in
+  the listing, and the range filter matches no row in it, which is the
+  right answer. A first version of the test asked for an unbroken chain
+  and went red on the hand check of rule 3, see below
 - singular `assert_listing_interval_is_ordered`:
   `listing_from_date <= listing_till_date` for every row
 
