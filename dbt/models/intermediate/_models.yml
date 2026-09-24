@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: int_moex_listing
+    description: >
+      The board listing prepared for the snapshot. One row per board and
+      security, the same rows as stg_moex_listing. Adds the exchange and
+      the natural key of a security, and replaces the moving last trade
+      date of a listed security with the sentinel 9999-12-31, so the
+      snapshot opens a version only on a real change. The listed rule is
+      a hypothesis about the source and is checked in specs/dim_security.md.
+    columns:
+      - name: security_id
+        description: >
+          Natural key of a security: exchange and sec_id, joined with a
+          pipe. The snapshot matches its versions on it. Board is not in
+          the key, a security is loaded from one main board only. A second
+          board of the same security would give two source rows for one
+          key and the snapshot merge would fail, which is the wanted signal.
+        data_tests:
+          - unique
+          - not_null
+      - name: exchange
+        description: "Exchange code, MOEX for now."
+      - name: sec_id
+        description: "Security ticker, local to the exchange."
+      - name: board
+        description: "Board code, TQBR for now."
+      - name: short_name
+        description: "Short name of the security."
+      - name: full_name
+        description: "Full name of the security, the legal name of the issue."
+      - name: price_decimals
+        description: "Number of decimal places in the price on the board."
+      - name: listing_from_date
+        description: "First trade date of the security on the board, from the source."
+      - name: listing_till_date
+        description: >
+          9999-12-31 while the security is on the board, else the last
+          trade date on the board from the source.
+        data_tests:
+          - not_null
+      - name: extracted_at
+        description: "When the extract script wrote the listing file to GCS."

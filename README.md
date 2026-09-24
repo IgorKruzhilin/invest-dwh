@@ -19,7 +19,8 @@ Three layers, medallion style, all in one BigQuery project.
 |---|---|---|---|
 | Raw | `raw` | External tables over Parquet files in GCS. The history has one object per trade day, partitioned by market, board and day in the path. Each reference table is one object, rewritten in full | the extract scripts in `extract/`, run by Airflow |
 | Staging | `stg` | One view per source. Names and types only, no business logic | dbt |
-| Marts | `dm` | The star. One fact today, its dimension is next. Every model has a spec in `specs/` | dbt |
+| Snapshot | `snap` | Type 2 history of the board listing, a dbt snapshot. The only state that cannot be rebuilt from GCS, so it has its own dataset and its own rules in `CONVENTIONS.md` | dbt |
+| Marts | `dm` | The star: one fact and one dimension. Every model has a spec in `specs/` | dbt |
 
 Raw data stays in GCS. BigQuery reads the Parquet files in place through
 external tables, so the storage is one copy and one bill. A query reads
@@ -28,13 +29,14 @@ about 190 MB of files.
 
 ### The night in Airflow
 
-Three DAGs, in `airflow/dags/`. The loaders know nothing about the marts.
+Four DAGs, in `airflow/dags/`. The loaders know nothing about the marts.
 
 | DAG | Schedule, UTC | What it does |
 |---|---|---|
 | `moex_daily` | 00:00, one run per trade day | loads one day of trade history into GCS, then runs the staging model and its tests |
 | `moex_reference` | 00:05 | reloads the board listing and the splits in full, then runs their tests |
-| `moex_marts` | 00:30 | waits for both loaders of the same night with `ExternalTaskSensor`, then builds and tests the marts |
+| `moex_marts` | 00:30 | waits for both loaders of the same night with `ExternalTaskSensor`, then builds and tests the fact |
+| `moex_dim` | on the Asset of `moex_reference` | snapshots the listing and rebuilds `dim_security` from the versions |
 
 The date always comes from the Airflow data interval, never from the
 clock. A rerun of the same day overwrites the same GCS object and
@@ -42,10 +44,13 @@ rebuilds the same partition, so a second run adds no rows. This was
 checked: the DAG ran twice for one day, the count and the number of
 distinct keys did not change.
 
-The marts wait with sensors on the logical date and not with an AND of
+The fact waits with sensors on the logical date and not with an AND of
 assets. An AND of assets fires on the first pair of events, and after
 one failed night the pairs shift by a day for good: the mart would read
-the splits of the day before, every night, in silence. The reason is in
+the splits of the day before, every night, in silence. The dimension has
+one input, so it needs no lock: it runs on the one Asset that
+`moex_reference` emits. A red fact does not stop the names on the site,
+and a red dimension does not stop the prices. The rule is in
 `CONVENTIONS.md`.
 
 ### The star
@@ -53,9 +58,15 @@ the splits of the day before, every night, in silence. The reason is in
 `fct_price_daily` is a periodic snapshot fact. One row per exchange,
 security and trade day. It holds the official close price and the
 cumulative split factor, the number that turns a lot quantity from one
-date into another. Its dimension, `dim_security`, is the next model: the
-spec is written, one row per exchange and security, the names and the
-price precision from the board listing.
+date into another. Its dimension, `dim_security`, is a type 2
+dimension: one row per exchange, security and version, with the names
+and the price precision from the board listing. The site shows the name
+and rounds with the precision, so the warehouse must be able to say what
+the site showed on a given day. The versions come from a dbt snapshot
+with the `check` strategy; a row that leaves the listing closes its
+version and a test stops the run. Open intervals end with `9999-12-31`,
+not with `null`, so "current" is one comparison and a range join needs
+no `coalesce`.
 
 The grain is proved by a query, not by a promise:
 
@@ -138,9 +149,13 @@ Short form. The long form with the numbers is in the specs and in
 - **No adjusted price column.** It rewrites history on every split and
   breaks the incremental by date. The split factor for a past date never
   changes.
-- **No snapshot of the listing.** The source already carries the
-  interval of board membership, and nobody reads the history of names.
-  A snapshot for its own sake is a demo, not a model.
+- **A snapshot of the listing, but only for what the site shows.** The
+  first version of the spec had no history: the source carries the
+  interval of board membership, and a snapshot for its own sake is a
+  demo. It changed when the site became the consumer of the names and
+  the precision: "why did the site show that" needs versions. The moving
+  last trade date is not tracked, it would open 500 versions a day; it
+  is mapped to a sentinel while the security is listed.
 - **Sensors, not an AND of assets, for a mart with two inputs.** See
   the night above.
 - **No key in CI.** Workload Identity Federation instead. Nothing to
@@ -148,12 +163,12 @@ Short form. The long form with the numbers is in the specs and in
 
 ## Status
 
-Done: the raw layer, staging, `fct_price_daily`, three DAGs, CI with
-a real build.
+Done: the raw layer, staging, `fct_price_daily`, `dim_security` with
+its snapshot, four DAGs, CI with a real build.
 
-Next: `dim_security` (spec written), export of the marts to the
-database of the site, an Iceberg table on the raw layer with a
-measurement of files and read time before and after.
+Next: export of the marts to the database of the site, an Iceberg table
+on the raw layer with a measurement of files and read time before and
+after.
 
 ## Setup on a new machine
 

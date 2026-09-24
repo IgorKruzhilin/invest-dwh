@@ -22,6 +22,14 @@ models:
       columns: true
     staging:
       +materialized: view
+    intermediate:
+      +materialized: view
     dm:
       +materialized: table
       +schema: dm
+
+snapshots:
+  invest_dwh:
+    # Own dataset for the only state that cannot be rebuilt from GCS.
+    # A drop in dm or stg is a rebuild, a drop in snap is a loss.
+    +schema: snap

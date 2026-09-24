@@ -9,7 +9,8 @@ object.
     gs://invest-dwh-raw/moex/listing/market=shares/board=TQBR/data.parquet
 
 The listing already keeps the history of board membership in history_from
-and history_till, so we store no snapshot of our own.
+and history_till, so this script stores one object and no history. The
+history of names and precision is a dbt snapshot in the warehouse.
 
 An empty answer is an error, not an empty day: a board always has
 securities. The script exits with code 1, never with 99.
